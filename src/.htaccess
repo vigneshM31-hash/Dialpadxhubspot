@@ -1,0 +1,11 @@
+RewriteEngine On
+
+# Ensure all API calls are routed to our proxy script
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^api/hubspot/(.*)$ proxy.php [L,QSA]
+
+# React Routing: Fallback to index.html for other paths
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [L]
