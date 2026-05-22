@@ -129,12 +129,16 @@ app.get('/oauth-callback', async (req, res) => {
         <script>
           try {
             if (window.opener) {
-              window.opener.postMessage({
+              const message = ${JSON.stringify({
                 type: 'HUBSPOT_OAUTH_SUCCESS',
-                hub_id: ${hub_id},
-                user: '${(user || '').replace(/'/g, "\\'")}'.replace(/\\'/g, "'"),
-                hub_domain: '${(hub_domain || '').replace(/'/g, "\\'")}'.replace(/\\'/g, "'")
-              }, '*');
+                hub_id,
+                user: user || '',
+                hub_domain: hub_domain || '',
+                access_token,
+                refresh_token,
+                expires_at: expiresAt
+              })};
+              window.opener.postMessage(message, '*');
               setTimeout(function() { window.close(); }, 2000);
             } else {
               document.querySelector('p:last-child').textContent = 'Connected! You can close this tab and return to the app.';
@@ -188,6 +192,12 @@ const injectToken = async (req, res, next) => {
           res.setHeader('X-HubSpot-OAuth-Refresh-Token', refreshedAccount.refresh_token);
           res.setHeader('X-HubSpot-OAuth-Expires-At', String(refreshedAccount.expires_at));
           res.setHeader('X-HubSpot-OAuth-Hub-Id', String(refreshedAccount.hub_id));
+          if (refreshedAccount.hub_domain) {
+            res.setHeader('X-HubSpot-OAuth-Hub-Domain', String(refreshedAccount.hub_domain));
+          }
+          if (refreshedAccount.user) {
+            res.setHeader('X-HubSpot-OAuth-User', String(refreshedAccount.user));
+          }
         }
       }
       req.headers.authorization = `Bearer ${installedAccounts[resolvedPortalId].access_token}`;
