@@ -21,6 +21,7 @@ import {
 } from "../types/ScreenTypes";
 import { CALYPSO, CALYPSO_DARK, GYPSUM, KOALA, OLAF, SLINKY } from "../utils/colors";
 import { FROM_NUMBER_ONE } from "../utils/phoneNumberUtils";
+import { getHubspotHeaders, handleHubspotResponse, saveHubspotTokens } from "../utils/hubspotAuth";
 
 const { thirdPartyToHostEvents } = Constants;
 
@@ -556,7 +557,9 @@ function App() {
     const checkOAuthStatus = async () => {
       try {
         const params = portalId ? `?portalId=${portalId}` : '';
-        const response = await fetch(`/api/hubspot/oauth-status${params}`);
+        const headers = getHubspotHeaders(hubspotSettings, portalId);
+        const response = await fetch(`/api/hubspot/oauth-status${params}`, { headers });
+        handleHubspotResponse(response);
         const data = await response.json();
         if (data.connected) {
           setOAuthStatus('connected');
@@ -569,16 +572,26 @@ function App() {
       }
     };
     checkOAuthStatus();
-  }, [portalId]);
+  }, [portalId, hubspotSettings]);
 
   // Listen for OAuth popup success message
   useEffect(() => {
     const handleOAuthMessage = (event: MessageEvent) => {
       if (event.data?.type === 'HUBSPOT_OAUTH_SUCCESS') {
-        const { hub_id, user, hub_domain } = event.data;
+        const { hub_id, user, hub_domain, access_token, refresh_token, expires_at } = event.data;
+        if (access_token && refresh_token && expires_at && hub_id) {
+          saveHubspotTokens({
+            accessToken: access_token,
+            refreshToken: refresh_token,
+            expiresAt: Number(expires_at),
+            hubId: String(hub_id),
+            hubDomain: hub_domain || undefined,
+            user: user || undefined,
+          });
+        }
+
         setOAuthStatus('connected');
         setOAuthAccount({ hub_id: String(hub_id), user: user || '', hub_domain: hub_domain || '' });
-        // Clear any manually stored access token — OAuth handles auth server-side now
         setHubspotSettings(prev => ({ ...prev, accessToken: '' }));
         setDraftHubspotSettings(prev => ({ ...prev, accessToken: '' }));
         localStorage.removeItem('hubspot_settings');

@@ -2,6 +2,7 @@ import React from "react";
 import styled from "styled-components";
 import { SLINKY, CALYPSO, CALYPSO_DARK, CALYPSO_LIGHT, CALYPSO_MEDIUM, KOALA } from "../utils/colors";
 import { Constants } from "@hubspot/calling-extensions-sdk";
+import { getHubspotHeaders, handleHubspotResponse } from "../utils/hubspotAuth";
 import type { IconBaseProps } from "react-icons/lib";
 import { 
   FiUser as _FiUser, 
@@ -315,14 +316,9 @@ const CrmView: React.FC<CrmViewProps> = ({ cti, onCall, portalId, activeContact,
     setLoading(true);
     setError(null);
     try {
-      const headers: any = {};
-      if (hubspotSettings.accessToken) {
-        headers["Authorization"] = `Bearer ${hubspotSettings.accessToken}`;
-      }
-      if (portalId) {
-        headers["X-HubSpot-Portal-Id"] = portalId;
-      }
+      const headers: any = getHubspotHeaders(hubspotSettings, portalId);
       const response = await fetch("/api/hubspot/contacts", { headers });
+      handleHubspotResponse(response);
       if (!response.ok) throw new Error(`API Error: ${response.status}`);
       const data = await response.json();
       if (data.results) {
@@ -342,7 +338,7 @@ const CrmView: React.FC<CrmViewProps> = ({ cti, onCall, portalId, activeContact,
     } finally {
       setLoading(false);
     }
-  }, [hubspotSettings.accessToken, portalId]);
+  }, [hubspotSettings, portalId]);
 
   const handleSubscribeWebhook = async () => {
     setSubmittingWebhook(true);
@@ -379,14 +375,9 @@ const CrmView: React.FC<CrmViewProps> = ({ cti, onCall, portalId, activeContact,
   const fetchTickets = React.useCallback(async (contactId: string) => {
     setTicketsLoading(true);
     try {
-      const headers: any = {};
-      if (hubspotSettings.accessToken) {
-        headers["Authorization"] = `Bearer ${hubspotSettings.accessToken}`;
-      }
-      if (portalId) {
-        headers["X-HubSpot-Portal-Id"] = portalId;
-      }
+      const headers: any = getHubspotHeaders(hubspotSettings, portalId);
       const response = await fetch(`/api/hubspot/tickets/${contactId}`, { headers });
+      handleHubspotResponse(response);
       if (response.ok) {
         const data = await response.json();
         setTickets(data.results || []);
@@ -396,7 +387,7 @@ const CrmView: React.FC<CrmViewProps> = ({ cti, onCall, portalId, activeContact,
     } finally {
       setTicketsLoading(false);
     }
-  }, [hubspotSettings.accessToken, portalId]);
+  }, [hubspotSettings, portalId]);
 
   React.useEffect(() => {
     fetchContacts();
@@ -445,13 +436,10 @@ const CrmView: React.FC<CrmViewProps> = ({ cti, onCall, portalId, activeContact,
     );
 
     try {
-      const headers: any = { "Content-Type": "application/json" };
-      if (hubspotSettings.accessToken) {
-        headers["Authorization"] = `Bearer ${hubspotSettings.accessToken}`;
-      }
-      if (portalId) {
-        headers["X-HubSpot-Portal-Id"] = portalId;
-      }
+      const headers: any = {
+        ...getHubspotHeaders(hubspotSettings, portalId),
+        "Content-Type": "application/json"
+      };
       const response = await fetch("/api/hubspot/tickets", {
         method: "POST",
         headers,
@@ -463,6 +451,7 @@ const CrmView: React.FC<CrmViewProps> = ({ cti, onCall, portalId, activeContact,
           stage: hubspotSettings.stage
         })
       });
+      handleHubspotResponse(response);
 
       if (response.ok) {
         setTicketStatus("Success!");
@@ -492,13 +481,10 @@ const CrmView: React.FC<CrmViewProps> = ({ cti, onCall, portalId, activeContact,
     
     setContactStatus("Saving...");
     try {
-      const headers: any = { "Content-Type": "application/json" };
-      if (hubspotSettings.accessToken) {
-        headers["Authorization"] = `Bearer ${hubspotSettings.accessToken}`;
-      }
-      if (portalId) {
-        headers["X-HubSpot-Portal-Id"] = portalId;
-      }
+      const headers: any = {
+        ...getHubspotHeaders(hubspotSettings, portalId),
+        "Content-Type": "application/json"
+      };
       const response = await fetch("/api/hubspot/contacts", {
         method: "POST",
         headers,
@@ -508,6 +494,7 @@ const CrmView: React.FC<CrmViewProps> = ({ cti, onCall, portalId, activeContact,
           phone: activeContact.number
         })
       });
+      handleHubspotResponse(response);
       if (response.ok) {
         setContactStatus("Contact Saved!");
         setTimeout(() => {

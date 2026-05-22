@@ -2,16 +2,19 @@
   "compilerOptions": {
     "noEmit": true,
     "jsx": "react-jsx",
-    "moduleResolution": "node",
+    "moduleResolution": "node16",
+    "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
     "strict": true,
     "lib": ["dom", "dom.iterable", "esnext"],
-    "module": "esnext",
+    "module": "Node16",
     "target": "esnext",
     "isolatedModules": true,
     "noErrorTruncation": true,
     "types": ["jasmine", "node", "@testing-library/jasmine-dom"]
   }
+  ,
+  "include": ["src"]
 }

@@ -64,7 +64,7 @@ async function refreshAccessToken(hubId) {
 app.post('/api/hubspot/webhooks', (req, res) => {
   const events = req.body;
   console.log(`📨 Received ${events.length} HubSpot webhook event(s)`);
-  
+
   events.forEach(event => {
     console.log(`✅ App activity registered: ${event.eventType} from Portal: ${event.portalId}`);
   });
@@ -103,16 +103,16 @@ app.get('/oauth-callback', async (req, res) => {
     const { hub_id, hub_domain, user } = accountInfo.data;
 
     console.log(`✅ OAuth Successful for Portal: ${hub_id}`);
-    
+
     const expiresAt = Date.now() + ((tokenResponse.data.expires_in || 21600) * 1000);
-    installedAccounts[hub_id] = { 
-      hub_id, 
-      hub_domain, 
-      user, 
-      access_token, 
-      refresh_token, 
+    installedAccounts[hub_id] = {
+      hub_id,
+      hub_domain,
+      user,
+      access_token,
+      refresh_token,
       expires_at: expiresAt,
-      installed_at: new Date().toISOString() 
+      installed_at: new Date().toISOString()
     };
 
     res.send(`<!DOCTYPE html>
@@ -157,19 +157,40 @@ app.get('/oauth-callback', async (req, res) => {
  */
 const injectToken = async (req, res, next) => {
   try {
-    const portalId = req.headers['x-hubspot-portal-id'] || req.query.portalId;
-    
-    if (portalId && installedAccounts[portalId]) {
-      const account = installedAccounts[portalId];
-      // Auto-refresh if the token expires within the next 5 minutes
+    const headerPortalId = req.headers['x-hubspot-portal-id'];
+    const portalId = headerPortalId || req.query.portalId;
+    const oauthAccessToken = req.headers['x-hubspot-oauth-access-token'];
+    const oauthRefreshToken = req.headers['x-hubspot-oauth-refresh-token'];
+    const oauthExpiresAt = req.headers['x-hubspot-oauth-expires-at'];
+    const oauthHubId = req.headers['x-hubspot-oauth-hub-id'];
+
+    const resolvedPortalId = portalId || oauthHubId;
+
+    if (resolvedPortalId && !installedAccounts[resolvedPortalId] && oauthAccessToken && oauthRefreshToken && oauthHubId) {
+      installedAccounts[resolvedPortalId] = {
+        hub_id: oauthHubId,
+        access_token: String(oauthAccessToken),
+        refresh_token: String(oauthRefreshToken),
+        expires_at: Number(oauthExpiresAt) || Date.now() + 3600 * 1000,
+        installed_at: new Date().toISOString()
+      };
+      console.log(`🔁 Rehydrated HubSpot token for portal ${resolvedPortalId} from client headers`);
+    }
+
+    if (resolvedPortalId && installedAccounts[resolvedPortalId]) {
+      const account = installedAccounts[resolvedPortalId];
       if (account.expires_at && Date.now() > account.expires_at - 5 * 60 * 1000) {
-        console.log(`🔄 Auto-refreshing expiring token for portal ${portalId}...`);
-        await refreshAccessToken(portalId);
+        console.log(`🔄 Auto-refreshing expiring token for portal ${resolvedPortalId}...`);
+        const refreshed = await refreshAccessToken(resolvedPortalId);
+        if (refreshed) {
+          const refreshedAccount = installedAccounts[resolvedPortalId];
+          res.setHeader('X-HubSpot-OAuth-Access-Token', refreshedAccount.access_token);
+          res.setHeader('X-HubSpot-OAuth-Refresh-Token', refreshedAccount.refresh_token);
+          res.setHeader('X-HubSpot-OAuth-Expires-At', String(refreshedAccount.expires_at));
+          res.setHeader('X-HubSpot-OAuth-Hub-Id', String(refreshedAccount.hub_id));
+        }
       }
-      // Inject the (possibly refreshed) token
-      if (installedAccounts[portalId]) {
-        req.headers.authorization = `Bearer ${installedAccounts[portalId].access_token}`;
-      }
+      req.headers.authorization = `Bearer ${installedAccounts[resolvedPortalId].access_token}`;
     }
     next();
   } catch (err) {
@@ -413,11 +434,10 @@ app.get('/api/hubspot/oauth-url', (req, res) => {
     return res.status(500).json({ error: 'OAuth credentials (HUBSPOT_CLIENT_ID, HUBSPOT_REDIRECT_URI) not configured in .env' });
   }
   const scopes = [
-    'crm.objects.contacts.read',
+    'tickets',
     'crm.objects.contacts.write',
-    'crm.objects.tickets.read',
-    'crm.objects.tickets.write',
-    'crm.schemas.contacts.read',
+    'oauth',
+    'crm.objects.contacts.read',
   ].join(' ');
   const authUrl = `https://app.hubspot.com/oauth/authorize?client_id=${HUBSPOT_CLIENT_ID}&redirect_uri=${encodeURIComponent(HUBSPOT_REDIRECT_URI)}&scope=${encodeURIComponent(scopes)}`;
   res.json({ url: authUrl });
