@@ -401,6 +401,24 @@ app.get('/api/hubspot/dialpad_events', (req, res) => {
 });
 
 /**
+ * Endpoint to fetch Dialpad users
+ */
+app.post('/api/hubspot/dialpad_users', async (req, res) => {
+  const { accessToken, accountType } = req.body;
+  const apiBaseUrl = accountType === 'sandbox' ? "https://dialpadbeta.com/api" : "https://dialpad.com/api";
+
+  try {
+    const response = await axios.get(`${apiBaseUrl}/v2/users`, {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error('Dialpad Users Error:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json(error.response?.data || { error: error.message });
+  }
+});
+
+/**
  * Endpoint to subscribe to Dialpad Webhooks
  */
 app.post('/api/hubspot/dialpad_subscribe', async (req, res) => {
